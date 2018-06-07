@@ -8,7 +8,7 @@ import glob
 import sys
 
 
-# Power supply settings
+# Power supply physical settings
 # BAUD rate = 9600
 # Connection type
 # Interface USB
@@ -146,7 +146,9 @@ with serial.Serial(port='COM3', baudrate=9600, bytesize=8, parity='N', stopbits=
         matplotlib.pyplot.ylabel('Voltage (V)')
         matplotlib.pyplot.xlabel('Time (s)')
         matplotlib.pyplot.pause(0.1)
-        matplotlib.pyplot.show()
+
+        # This causes the code to nor work, only works in master file
+        # matplotlib.pyplot.show()
 
         time.sleep(3 - ((time.time() - start_time) % 3.0))      # Corrects for time drift due to code execution
 
