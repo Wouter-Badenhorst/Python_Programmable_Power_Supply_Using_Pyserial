@@ -86,7 +86,7 @@ with serial.Serial(port='COM3', baudrate=9600, bytesize=8, parity='N', stopbits=
         exit()
 
     start_time = time.time()                                    # Records the initial time for drift correction
-    end_time = start_time + 1 * 9                               # Sets the end time of the experiment (+ seconds)
+    end_time = start_time + 1 * 20                              # Sets the end time of the experiment (+ seconds)
 
     # Initiates all the arrays used to capture data as empty arrays, numpy.append will be used to increase their
     # length after each new data input
@@ -95,6 +95,9 @@ with serial.Serial(port='COM3', baudrate=9600, bytesize=8, parity='N', stopbits=
     ampere_reading_list = numpy.array([])                       # Initiates the ampere measurement list
     voltage_reading_list = numpy.array([])                      # Initiates the vol measurement list
     date_time_list_seconds = numpy.array([])                    # Initiates the sec measurement list
+
+    ser.write(b'GPC 0.1\r')
+    time.sleep(0.1)
 
     while time.time() < end_time:
 
@@ -147,14 +150,11 @@ with serial.Serial(port='COM3', baudrate=9600, bytesize=8, parity='N', stopbits=
         matplotlib.pyplot.xlabel('Time (s)')
         matplotlib.pyplot.pause(0.1)
 
-        # This causes the code to nor work, only works in master file
-        # matplotlib.pyplot.show()
-
-        time.sleep(3 - ((time.time() - start_time) % 3.0))      # Corrects for time drift due to code execution
+        time.sleep(5 - ((time.time() - start_time) % 5.0))      # Corrects for time drift due to code execution
 
     # Exporting of the data using the Pandas library, works more effortless than the csv module commonly used.
     # The index can be set to False, I however, will use it for time calculations and checking for drift of the
-    # timer used in the program.
+    #  timer used in the program.
 
     data = pandas.DataFrame({'Time': date_time_list, 'Seconds': date_time_list_seconds,
                              'Current': ampere_reading_list, 'Volt': voltage_reading_list})
@@ -162,6 +162,10 @@ with serial.Serial(port='COM3', baudrate=9600, bytesize=8, parity='N', stopbits=
 
 # Indicates that the program has successfully finished and shows the name of the csv file generated containing
 # all the data obtained during the run, which includes the time, amperes and the voltage applied.
+
+ser.open()
+ser.write(b'GPC 0.0\r')
+ser.close()
 
 print('\nRun has successfully been completed')
 print('Output stored in:', datetime.datetime.today().strftime("%d%m%Y")+'.csv')
