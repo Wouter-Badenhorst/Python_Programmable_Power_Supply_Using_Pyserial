@@ -16,7 +16,7 @@ import sys
 # Address 06
 
 
-def serial_ports():                                                             # Searches for available COM ports
+def serial_ports():                                                             # Searches for available serial ports
 
     if sys.platform.startswith('win'):
         ports = ['COM%s' % (i + 1) for i in range(256)]
@@ -37,15 +37,16 @@ def serial_ports():                                                             
             result.append(port)
         except (OSError, serial.SerialException):
             pass
+        print(port)
     return result
 
 
 print('Available serial ports: ', serial_ports())                                   # Prints all available ports
 
-with serial.Serial(port='COM3', baudrate=9600, bytesize=8, parity='N', stopbits=1,  # Initiates communication with PSU
-                   xonxoff=False, rtscts=True, dsrdtr=False, timeout=1) as ser:
+with serial.Serial(port='/dev/ttyACM0', baudrate=9600, bytesize=8, parity='N', stopbits=1,
+                   xonxoff=False, rtscts=True, dsrdtr=False, timeout=1) as ser:     # Initiates communication with PSU
 
-    ser.set_buffer_size(rx_size=12800, tx_size=12800)                               # Sets buffer sizes, arbitrary?
+    # ser.set_buffer_size(rx_size=12800, tx_size=12800)                             # Sets buffer sizes, arbitrary?
 
     ser.write_timeout = None                                                        # Some PySerial functions require
     ser.read_timeout = None                                                         # this to properly work
@@ -71,9 +72,10 @@ with serial.Serial(port='COM3', baudrate=9600, bytesize=8, parity='N', stopbits=
         else:
             print('\nCommand message not found in input buffer')
 
-        response = ser.read(2).decode()                         # Reads 2 bits and decodes into ASCII characters
+        response = ser.read(3).decode()                         # Reads 3 bits and decodes into ASCII characters
+        print(response)
 
-        if response == 'OK':                                    # Checks if correct response is returned from the
+        if response == '~OK':                                   # Checks if correct response is returned from the
             print('Instrument response:', response)             # PSU, 'OK' in this case
             print('\nInstrument ready for further commands')
 
@@ -86,18 +88,18 @@ with serial.Serial(port='COM3', baudrate=9600, bytesize=8, parity='N', stopbits=
         exit()
 
     start_time = time.time()                                    # Records the initial time for drift correction
-    end_time = start_time + 1 * 20                              # Sets the end time of the experiment (+ seconds)
+    end_time = start_time + 1 * 18000                              # Sets the end time of the experiment (+ seconds)
 
     # Initiates all the arrays used to capture data as empty arrays, numpy.append will be used to increase their
     # length after each new data input
 
     date_time_list = numpy.array([])                            # Initiates the date time measurement list
     ampere_reading_list = numpy.array([])                       # Initiates the ampere measurement list
-    voltage_reading_list = numpy.array([])                      # Initiates the vol measurement list
-    date_time_list_seconds = numpy.array([])                    # Initiates the sec measurement list
+    voltage_reading_list = numpy.array([])                      # Initiates the voltage measurement list
+    date_time_list_seconds = numpy.array([])                    # Initiates the seconds measurement list
 
-    ser.write(b'GPC 0.1\r')
-    time.sleep(0.1)
+    ser.write(b'GPC 1.0\r')                                     # Initiates the current
+    time.sleep(0.1)                                             # Allows for input processing by power supply
 
     while time.time() < end_time:
 
@@ -132,8 +134,8 @@ with serial.Serial(port='COM3', baudrate=9600, bytesize=8, parity='N', stopbits=
         # Removal of carriage return added to values when reading from instrument (expected)
         # Increases readability and eases future use of data
 
-        voltage_reading_list = [i.strip() for i in voltage_reading_list]
-        ampere_reading_list = [i.strip() for i in ampere_reading_list]
+        voltage_reading_list = [i.strip('~') for i in voltage_reading_list]
+        ampere_reading_list = [i.strip('~') for i in ampere_reading_list]
 
         # As the carriage return was part of the data stored in the numpy array the values are now of the type str
         # for the values to be used and exported they should be converted back into a float (preserving decimals)
@@ -145,12 +147,22 @@ with serial.Serial(port='COM3', baudrate=9600, bytesize=8, parity='N', stopbits=
         # Captures the real time data, this is used to determine if something has gone wrong in the internal system
         # through plotting of the data. As physically detecting problems with the run will be near impossible.
 
-        matplotlib.pyplot.plot(date_time_list_seconds, voltage_reading_list)
-        matplotlib.pyplot.ylabel('Voltage (V)')
-        matplotlib.pyplot.xlabel('Time (s)')
+        fig, ax1 = matplotlib.pyplot.subplots()
+        ax2 = ax1.twinx()
+        ax1.plot(date_time_list_seconds, voltage_reading_list, 'g-')
+        ax2.plot(date_time_list_seconds, ampere_reading_list, 'b-')
+        ax1.set_xlabel('Time (s)')
+        ax1.set_ylabel('Voltage (V)', color='g')
+        ax2.set_ylabel('Ampere (A)', color='b')
         matplotlib.pyplot.pause(0.1)
+        matplotlib.pyplot.show()
 
-        time.sleep(5 - ((time.time() - start_time) % 5.0))      # Corrects for time drift due to code execution
+        # matplotlib.pyplot.plot(date_time_list_seconds, voltage_reading_list)
+        # matplotlib.pyplot.ylabel('Voltage (V)')
+        # matplotlib.pyplot.xlabel('Time (s)')
+        # matplotlib.pyplot.pause(0.1)
+
+        time.sleep(600 - ((time.time() - start_time) % 600.0))      # Corrects for time drift due to code execution
 
     # Exporting of the data using the Pandas library, works more effortless than the csv module commonly used.
     # The index can be set to False, I however, will use it for time calculations and checking for drift of the
